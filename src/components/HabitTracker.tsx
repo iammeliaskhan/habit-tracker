@@ -12,9 +12,18 @@ type Habit = {
   createdAt: string;
 };
 
+type User = {
+  id: string;
+  name: string;
+  color: string | null;
+  createdAt: string;
+};
+
 type InitialData = {
   today: string; // YYYY-MM-DD
   weekStart: string; // YYYY-MM-DD (Monday)
+  users: User[];
+  activeUserId: string;
   habits: Habit[];
   completedByDate: Record<string, string[]>; // date -> habitIds
 };
@@ -84,6 +93,9 @@ export default function HabitTracker({ initial }: { initial: InitialData }) {
   const [view, setView] = useState<View>("today");
   const [focusedDate, setFocusedDate] = useState<string>(initial.today);
 
+  const [users] = useState<User[]>(initial.users);
+  const [activeUserId, setActiveUserId] = useState<string>(initial.activeUserId);
+
   const [habits, setHabits] = useState<Habit[]>(initial.habits);
   const [completed, setCompleted] = useState<Map<string, Set<string>>>(() =>
     buildCompletedMap(initial.completedByDate),
@@ -138,6 +150,36 @@ export default function HabitTracker({ initial }: { initial: InitialData }) {
       // rollback
       setCompletedValue(date, habitId, !nextValue);
       setError("Failed to update check-in");
+    }
+  }
+
+  const activeUser = useMemo(
+    () => users.find((u) => u.id === activeUserId) ?? users[0],
+    [activeUserId, users],
+  );
+
+  async function setActiveProfile(userId: string) {
+    setBusy(true);
+    setError(null);
+
+    try {
+      const res = await fetch("/api/users/active", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new Error(body?.error ?? "Failed to switch profile");
+      }
+
+      setActiveUserId(userId);
+      // Server-rendered data depends on active profile; simplest is a refresh.
+      window.location.reload();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to switch profile");
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -292,15 +334,44 @@ export default function HabitTracker({ initial }: { initial: InitialData }) {
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center">
+            <div className="inline-flex items-center gap-2">
+              <span className="text-xs font-medium text-zinc-500">Profile</span>
+              <select
+                value={activeUserId}
+                onChange={(e) => void setActiveProfile(e.target.value)}
+                disabled={busy}
+                className="h-9 rounded-md border border-zinc-200 bg-white px-3 text-sm text-zinc-900"
+              >
+                {users.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <Link
+              href="/profiles"
+              className="h-9 rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50"
+            >
+              Manage
+            </Link>
+
             <Link
               href="/stats"
-              className="rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50"
+              className="h-9 rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50"
             >
               Stats
             </Link>
           </div>
         </div>
+
+        {activeUser ? (
+          <div className="mt-3 text-xs text-zinc-500">
+            Active profile: <span className="font-medium text-zinc-700">{activeUser.name}</span>
+          </div>
+        ) : null}
 
         <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
           <div className="rounded-xl border border-zinc-200 bg-white p-4">

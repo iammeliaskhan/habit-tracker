@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { todayISODate, parseISODateUTC } from "@/lib/dates";
 import { createHabitSchema } from "@/lib/schemas";
+import { getActiveUserId } from "@/lib/activeUser";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -18,8 +19,10 @@ export async function GET(request: Request) {
     );
   }
 
+  const userId = await getActiveUserId();
+
   const habits = await prisma.habit.findMany({
-    where: { archivedAt: null },
+    where: { archivedAt: null, userId },
     orderBy: { createdAt: "asc" },
     select: { id: true, name: true, color: true, createdAt: true },
   });
@@ -54,8 +57,10 @@ export async function POST(request: Request) {
     );
   }
 
+  const userId = await getActiveUserId();
+
   const habit = await prisma.habit.create({
-    data: parsed.data,
+    data: { ...parsed.data, userId },
     select: { id: true, name: true, color: true, createdAt: true },
   });
 

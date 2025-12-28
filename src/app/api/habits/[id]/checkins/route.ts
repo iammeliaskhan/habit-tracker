@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { parseISODateUTC } from "@/lib/dates";
 import { toggleCheckInSchema } from "@/lib/schemas";
+import { getActiveUserId } from "@/lib/activeUser";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -26,6 +27,16 @@ export async function POST(request: Request, { params }: Params) {
       { error: e instanceof Error ? e.message : "Invalid date" },
       { status: 400 },
     );
+  }
+
+  const userId = await getActiveUserId();
+
+  const habit = await prisma.habit.findFirst({
+    where: { id: habitId, userId },
+    select: { id: true },
+  });
+  if (!habit) {
+    return NextResponse.json({ error: "Habit not found" }, { status: 404 });
   }
 
   const key = { habitId, date };

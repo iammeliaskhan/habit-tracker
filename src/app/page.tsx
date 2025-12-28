@@ -1,5 +1,6 @@
 import HabitTracker from "@/components/HabitTracker";
 import { prisma } from "@/lib/prisma";
+import { getActiveUserId } from "@/lib/activeUser";
 import {
   addDaysUTC,
   parseISODateUTC,
@@ -18,8 +19,15 @@ export default async function Home() {
   // For "History" and summary stats, include the last 30 days (incl. today).
   const historyStart = addDaysUTC(today, -29);
 
+  const activeUserId = await getActiveUserId();
+
+  const users = await prisma.user.findMany({
+    orderBy: { createdAt: "asc" },
+    select: { id: true, name: true, color: true, createdAt: true },
+  });
+
   const habits = await prisma.habit.findMany({
-    where: { archivedAt: null },
+    where: { archivedAt: null, userId: activeUserId },
     orderBy: { createdAt: "asc" },
     select: { id: true, name: true, color: true, createdAt: true },
   });
@@ -48,6 +56,11 @@ export default async function Home() {
       initial={{
         today: todayStr,
         weekStart: toISODateUTC(weekStart),
+        users: users.map((u) => ({
+          ...u,
+          createdAt: u.createdAt.toISOString(),
+        })),
+        activeUserId,
         habits: habits.map((h) => ({
           ...h,
           createdAt: h.createdAt.toISOString(),

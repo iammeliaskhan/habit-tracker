@@ -23,12 +23,20 @@ async function main() {
     { name: "Protein goal", color: "#f59e0b" },
   ];
 
+  const user =
+    (await prisma.user.findFirst({ orderBy: { createdAt: "asc" } })) ??
+    (await prisma.user.create({ data: { name: "Default", color: "#0ea5e9" } }));
+
   const existing = await prisma.habit.findMany({
+    where: { userId: user.id },
     select: { name: true },
   });
   const existingNames = new Set(existing.map((h) => h.name));
 
-  const missing = seedHabits.filter((h) => !existingNames.has(h.name));
+  const missing = seedHabits
+    .filter((h) => !existingNames.has(h.name))
+    .map((h) => ({ ...h, userId: user.id }));
+
   if (missing.length === 0) return;
 
   await prisma.habit.createMany({ data: missing });

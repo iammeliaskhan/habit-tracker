@@ -7,14 +7,27 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model User {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  color     String?
+  createdAt DateTime @default(now())
+
+  habits Habit[]
+}
+
 model Habit {
   id         String          @id @default(cuid())
+  userId     String
   name       String
   color      String?
   createdAt  DateTime        @default(now())
   archivedAt DateTime?
 
+  user     User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   checkIns HabitCheckIn[]
+
+  @@index([userId])
 }
 
 model HabitCheckIn {
